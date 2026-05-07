@@ -21,6 +21,9 @@ dist-ssr
 android/.gradle/
 android/local.properties
 
+# Leftover if .git was repaired (root-owned objects can't be deleted without sudo)
+.git.broken.bak/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
