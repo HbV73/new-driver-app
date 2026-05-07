@@ -1,0 +1,1 @@
+ALTER TYPE public.damage_cause ADD VALUE IF NOT EXISTS 'lost';
