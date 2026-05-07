@@ -54,6 +54,17 @@ jobs:
       - name: Install npm dependencies
         run: npm ci
 
+      # Secrets are empty when unset; fail here instead of shipping a broken APK.
+      - name: Verify Supabase secrets exist
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}
+        run: |
+          if [ -z "${VITE_SUPABASE_URL}" ] || [ -z "${VITE_SUPABASE_PUBLISHABLE_KEY}" ]; then
+            echo "::error::Missing Actions secrets. In this repo: Settings → Secrets and variables → Actions → Repository secrets. Add exactly: VITE_SUPABASE_URL (project URL) and VITE_SUPABASE_PUBLISHABLE_KEY (anon/public key from Supabase Dashboard → Settings → API)."
+            exit 1
+          fi
+
       - name: Build web (Vite)
         env:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
