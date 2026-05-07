@@ -7,7 +7,9 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 // https://vitejs.dev/config/
+// Capacitor WebView: use relative asset URLs (see https://capacitorjs.com/docs/web#vite)
 export default defineConfig({
+  base: "./",
   server: {
     host: "::",
     port: 8080,
