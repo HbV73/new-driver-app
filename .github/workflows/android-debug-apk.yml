@@ -1,6 +1,5 @@
 # Builds a debug APK on GitHub Actions (no Android Studio needed locally).
-# Required repo secrets: VITE_SUPABASE_URL, VITE_SUPABASE_PUBLISHABLE_KEY
-# (Settings → Secrets and variables → Actions)
+# Demo Supabase credentials are inlined for CI (replace when moving past demo).
 
 name: Android debug APK
 
@@ -54,21 +53,10 @@ jobs:
       - name: Install npm dependencies
         run: npm ci
 
-      # Secrets are empty when unset; fail here instead of shipping a broken APK.
-      - name: Verify Supabase secrets exist
-        env:
-          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
-          VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}
-        run: |
-          if [ -z "${VITE_SUPABASE_URL}" ] || [ -z "${VITE_SUPABASE_PUBLISHABLE_KEY}" ]; then
-            echo "::error::Missing Actions secrets. In this repo: Settings → Secrets and variables → Actions → Repository secrets. Add exactly: VITE_SUPABASE_URL (project URL) and VITE_SUPABASE_PUBLISHABLE_KEY (anon/public key from Supabase Dashboard → Settings → API)."
-            exit 1
-          fi
-
       - name: Build web (Vite)
         env:
-          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
-          VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}
+          VITE_SUPABASE_URL: https://igvureriqikqtefxqkje.supabase.co
+          VITE_SUPABASE_PUBLISHABLE_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlndnVyZXJpcWlrcXRlZnhxa2plIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ0MzU3OTMsImV4cCI6MjA5MDAxMTc5M30.XTI5dPBIfUZmT_8hMplJ8zZ9uurvMJI2toj4Y-gm8j4
           VITE_DRIVER_API_PROVIDER: supabase
         run: npm run build
 
