@@ -2,6 +2,9 @@ import { useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { sendPlatformEvent } from '@/lib/platformSync';
 
+const provider = import.meta.env.VITE_DRIVER_API_PROVIDER ?? 'supabase';
+const REST_POSTTRIP_KEY = 'rs_rest_posttrip_today';
+
 const today = () => new Date().toISOString().slice(0, 10);
 const yesterday = () => {
   const d = new Date();
@@ -22,6 +25,19 @@ export function useKmDeviationCheck(threshold = 30) {
    * If diff > threshold → creates a km_deviation_alerts row and notifies admin.
    */
   const check = useCallback(async (todayStartKm: number): Promise<KmDeviationCheckResult> => {
+    if (provider === 'rest') {
+      const prevRaw = localStorage.getItem(REST_POSTTRIP_KEY);
+      const prev = prevRaw ? JSON.parse(prevRaw) as { end_km?: number; log_date?: string } : null;
+      const yEnd = (prev?.log_date === yesterday()) ? (prev.end_km ?? null) : null;
+      if (yEnd == null) return { hasDeviation: false, deviationKm: 0, yesterdayEndKm: null };
+      const deviation = todayStartKm - yEnd;
+      return {
+        hasDeviation: deviation > threshold,
+        deviationKm: deviation,
+        yesterdayEndKm: yEnd,
+      };
+    }
+
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return { hasDeviation: false, deviationKm: 0, yesterdayEndKm: null };
 
@@ -64,6 +80,10 @@ export function useKmDeviationCheck(threshold = 30) {
   }, [threshold]);
 
   const submitExplanation = useCallback(async (alertId: string, explanation: string) => {
+    if (provider === 'rest') {
+      void sendPlatformEvent('km_deviation_alert', today(), { id: alertId, driver_explanation: explanation, updated: true });
+      return;
+    }
     const { error } = await supabase
       .from('km_deviation_alerts')
       .update({ driver_explanation: explanation } as never)

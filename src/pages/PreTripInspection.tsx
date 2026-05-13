@@ -17,6 +17,9 @@ import { sendPlatformEvent } from '@/lib/platformSync';
 import { useKmDeviationCheck } from '@/hooks/useKmDeviationCheck';
 import { toast } from 'sonner';
 
+const provider = import.meta.env.VITE_DRIVER_API_PROVIDER ?? 'supabase';
+const REST_PRETRIP_KEY = 'rs_rest_pretrip_today';
+
 type ChecklistKey =
   | 'brakes_ok' | 'tires_ok' | 'lights_ok' | 'oil_level_ok'
   | 'adblue_ok' | 'body_damage_ok' | 'first_aid_kit_ok'
@@ -69,6 +72,37 @@ const PreTripInspection = () => {
     const sig = signature;
     setSubmitting(true);
     try {
+      if (provider === 'rest') {
+        const today = new Date().toISOString().slice(0, 10);
+        const startKmNum = startKm ? Number(startKm) : null;
+        const payload = {
+          log_date: today,
+          ...checks,
+          start_km: startKmNum,
+          fuel_level_percent: fuel ? Number(fuel) : null,
+          signature_data: signature,
+          defects_noted: defects,
+          blocked_from_driving: !allOk,
+          odometer_photo_url: odometerPhoto?.url ?? null,
+          fuel_gauge_photo_url: fuelPhoto?.url ?? null,
+          odometer_photo_gps_lat: odometerPhoto?.lat ?? null,
+          odometer_photo_gps_lng: odometerPhoto?.lng ?? null,
+          odometer_photo_taken_at: odometerPhoto?.takenAt ?? null,
+        };
+        localStorage.setItem(REST_PRETRIP_KEY, JSON.stringify(payload));
+        toast.success(allOk ? '✓ Check abgeschlossen' : '⚠️ Mängel gemeldet');
+        void sendPlatformEvent('override', today, {
+          type: 'pre_trip_inspection',
+          all_ok: allOk,
+          defects: defects || null,
+          odometer_photo_url: odometerPhoto?.url ?? null,
+          fuel_gauge_photo_url: fuelPhoto?.url ?? null,
+          provider: 'rest-local-cache',
+        });
+        navigate('/work-time');
+        return;
+      }
+
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { toast.error('Auth error'); return; }
       const today = new Date().toISOString().slice(0, 10);

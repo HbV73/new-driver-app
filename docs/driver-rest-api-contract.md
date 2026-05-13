@@ -8,7 +8,7 @@ should implement the same driver operations exposed by `DriverApi`.
 
 - `VITE_DRIVER_API_PROVIDER=supabase` uses the current Supabase adapter.
 - `VITE_DRIVER_API_PROVIDER=rest` selects the placeholder REST adapter.
-- `VITE_DRIVER_API_BASE_URL=https://api.example.com` will be required for REST.
+- `VITE_DRIVER_API_BASE_URL=https://apis.germanwm.de` is the project base URL for REST.
 
 ## Auth Assumptions
 

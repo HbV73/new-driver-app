@@ -19,6 +19,22 @@ import type { Tables } from '@/integrations/supabase/types';
 import { toast } from 'sonner';
 
 type ActivityLogRow = Tables<'driver_activity_logs'>;
+type RestWorkSession = {
+  date: string;
+  status: 'not_started' | 'working' | 'ended';
+  work_start?: string | null;
+  work_end?: string | null;
+  break_minutes?: number | null;
+  start_km?: number | null;
+  end_km?: number | null;
+  driven_km?: number | null;
+  notes?: string | null;
+  vehicle_preloaded_for_next_day?: boolean;
+};
+
+const provider = import.meta.env.VITE_DRIVER_API_PROVIDER ?? 'supabase';
+const restBaseUrl = String(import.meta.env.VITE_DRIVER_API_BASE_URL ?? '').replace(/\/+$/, '');
+const REST_WORKTIME_KEY = 'rs_rest_worktime_today';
 
 function toTime(value?: string | null) {
   if (!value) return '';
@@ -39,7 +55,7 @@ function minutesBetween(startTime: string, endDate: Date) {
 
 const WorkTime = () => {
   const { t, lang } = useLanguage();
-  const { user } = useAuth();
+  const { user, session } = useAuth();
   const navigate = useNavigate();
   const [workStarted, setWorkStarted] = useState(false);
   const [startTime, setStartTime] = useState('');
@@ -77,6 +93,45 @@ const WorkTime = () => {
   const [geoCheck, setGeoCheck] = useState<GeofenceCheck | null>(null);
 
   const now = new Date();
+  const restRequest = async (path: string, init?: RequestInit) => {
+    if (!restBaseUrl || !session?.access_token) throw new Error('REST auth/base URL missing');
+    const response = await fetch(`${restBaseUrl}${path}`, {
+      ...init,
+      headers: {
+        Authorization: `Bearer ${session.access_token}`,
+        Accept: 'application/json',
+        ...(init?.body ? { 'Content-Type': 'application/json' } : {}),
+        ...(init?.headers ?? {}),
+      },
+    });
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok || body?.status === false) {
+      throw new Error(body?.message || `Request failed (${response.status})`);
+    }
+    return body?.data;
+  };
+
+  const readLocalWorkCache = (): RestWorkSession | null => {
+    const raw = localStorage.getItem(REST_WORKTIME_KEY);
+    if (!raw) return null;
+    try {
+      return JSON.parse(raw) as RestWorkSession;
+    } catch {
+      return null;
+    }
+  };
+
+  const writeLocalWorkCache = (patch: Partial<RestWorkSession>) => {
+    const current = readLocalWorkCache();
+    const next: RestWorkSession = {
+      date: todayIso,
+      status: 'not_started',
+      ...(current ?? {}),
+      ...patch,
+    };
+    localStorage.setItem(REST_WORKTIME_KEY, JSON.stringify(next));
+  };
+
   const locale = lang === 'de' ? 'de-DE' : 'en-US';
   const todayIso = now.toISOString().slice(0, 10);
 
@@ -90,6 +145,44 @@ const WorkTime = () => {
     let cancelled = false;
 
     const loadActivityLog = async () => {
+      if (provider === 'rest') {
+        try {
+          const data = await restRequest(`/api/v1/drivers/me/work-session?date=${todayIso}`) as RestWorkSession;
+          if (cancelled) return;
+          if (data?.status === 'working') {
+            setWorkStarted(true);
+            setWorkEnded(false);
+            setStartTime(toTime(data.work_start));
+            setBreakMinutes(data.break_minutes ?? 0);
+            writeLocalWorkCache(data);
+          } else if (data?.status === 'ended') {
+            setWorkStarted(false);
+            setWorkEnded(true);
+            setBreakMinutes(data.break_minutes ?? 0);
+            writeLocalWorkCache(data);
+          } else {
+            setWorkStarted(false);
+            setWorkEnded(false);
+          }
+          return;
+        } catch {
+          // Endpoint may not be deployed yet; fallback to local cache.
+          const cached = readLocalWorkCache();
+          if (!cached || cached.date !== todayIso) return;
+          if (cached.status === 'working') {
+            setWorkStarted(true);
+            setWorkEnded(false);
+            setStartTime(toTime(cached.work_start));
+            setBreakMinutes(cached.break_minutes ?? 0);
+          } else if (cached.status === 'ended') {
+            setWorkStarted(false);
+            setWorkEnded(true);
+            setBreakMinutes(cached.break_minutes ?? 0);
+          }
+          return;
+        }
+      }
+
       const { data, error } = await supabase
         .from('driver_activity_logs')
         .select('*')
@@ -125,6 +218,13 @@ const WorkTime = () => {
 
   const saveActivityLog = async (patch: Partial<ActivityLogRow>) => {
     if (!user) return;
+    if (provider === 'rest') {
+      writeLocalWorkCache({
+        ...patch,
+        date: todayIso,
+      } as Partial<RestWorkSession>);
+      return;
+    }
     const row = {
       user_id: user.id,
       log_date: todayIso,
@@ -153,17 +253,43 @@ const WorkTime = () => {
     setWorkStarted(true);
     setStartTime(startedAt.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' }));
     sessionStorage.setItem('work_started', 'true');
-    void saveActivityLog({
-      work_start: startedAt.toISOString(),
-      work_end: null,
-      break_minutes: 0,
-      start_km: preTripStartKm ?? null,
-      start_lat: position.lat,
-      start_lng: position.lng,
-      start_location_type: locationType,
-      override_reason: overrideReason ?? null,
-      depot_id: geoCheck?.depot?.id ?? null,
-    });
+    if (provider === 'rest') {
+      try {
+        await restRequest('/api/v1/drivers/me/work-session/start', {
+          method: 'POST',
+          body: JSON.stringify({
+            date: todayIso,
+            work_start: startedAt.toISOString(),
+            start_km: preTripStartKm ?? null,
+            start_lat: position.lat,
+            start_lng: position.lng,
+            start_location_type: locationType,
+            override_reason: overrideReason ?? null,
+            depot_id: geoCheck?.depot?.id ?? null,
+          }),
+        });
+      } catch {
+        writeLocalWorkCache({
+          date: todayIso,
+          status: 'working',
+          work_start: startedAt.toISOString(),
+          break_minutes: 0,
+          start_km: preTripStartKm ?? null,
+        });
+      }
+    } else {
+      void saveActivityLog({
+        work_start: startedAt.toISOString(),
+        work_end: null,
+        break_minutes: 0,
+        start_km: preTripStartKm ?? null,
+        start_lat: position.lat,
+        start_lng: position.lng,
+        start_location_type: locationType,
+        override_reason: overrideReason ?? null,
+        depot_id: geoCheck?.depot?.id ?? null,
+      });
+    }
 
     // Fire-and-forget sync to admin platform
     void sendPlatformEvent('work_start', todayIso, {
@@ -266,15 +392,46 @@ const WorkTime = () => {
     setWorkStarted(false);
     setWorkEnded(true);
     sessionStorage.removeItem('work_started');
-    void saveActivityLog({
-      work_end: endedAt.toISOString(),
-      break_minutes: breakMinutes,
-      driven_km: displayKm || null,
-      end_km: postTripEndKm ?? null,
-      total_work_minutes: totalMinutes,
-      vehicle_preloaded_for_next_day: vehiclePreloaded,
-      notes: dayNote || null,
-    });
+    if (provider === 'rest') {
+      void (async () => {
+        try {
+          await restRequest('/api/v1/drivers/me/work-session/end', {
+            method: 'POST',
+            body: JSON.stringify({
+              date: todayIso,
+              work_end: endedAt.toISOString(),
+              break_minutes: breakMinutes,
+              driven_km: displayKm || null,
+              end_km: postTripEndKm ?? null,
+              total_work_minutes: totalMinutes,
+              vehicle_preloaded_for_next_day: vehiclePreloaded,
+              notes: dayNote || null,
+            }),
+          });
+        } catch {
+          writeLocalWorkCache({
+            date: todayIso,
+            status: 'ended',
+            work_end: endedAt.toISOString(),
+            break_minutes: breakMinutes,
+            driven_km: displayKm || null,
+            end_km: postTripEndKm ?? null,
+            notes: dayNote || null,
+            vehicle_preloaded_for_next_day: vehiclePreloaded,
+          });
+        }
+      })();
+    } else {
+      void saveActivityLog({
+        work_end: endedAt.toISOString(),
+        break_minutes: breakMinutes,
+        driven_km: displayKm || null,
+        end_km: postTripEndKm ?? null,
+        total_work_minutes: totalMinutes,
+        vehicle_preloaded_for_next_day: vehiclePreloaded,
+        notes: dayNote || null,
+      });
+    }
 
     // Sync end-of-day to admin platform
     void sendPlatformEvent('work_end', todayIso, {

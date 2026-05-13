@@ -96,13 +96,14 @@ async function applyLocalStopState(routeData: DriverRouteData, driverUserId: str
 export async function fetchDriverRouteForDate(
   driverUserId: string,
   routeDate: string,
+  accessToken?: string,
 ): Promise<DriverRouteData | null> {
-  const routeData = await getDriverApi().getRouteByDate({ driverUserId }, routeDate);
+  const routeData = await getDriverApi().getRouteByDate({ driverUserId, accessToken }, routeDate);
   return routeData ? applyLocalStopState(routeData, driverUserId) : null;
 }
 
 export function useTodayRoute(routeDate = todayIsoDate()): UseTodayRouteResult {
-  const { user } = useAuth();
+  const { user, session } = useAuth();
   const [routeData, setRouteData] = useState<DriverRouteData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -119,7 +120,7 @@ export function useTodayRoute(routeDate = todayIsoDate()): UseTodayRouteResult {
     setError(null);
 
     try {
-      const nextRoute = await fetchDriverRouteForDate(user.id, routeDate);
+      const nextRoute = await fetchDriverRouteForDate(user.id, routeDate, session?.access_token);
       setRouteData(nextRoute);
     } catch (err) {
       setRouteData(null);
@@ -127,7 +128,7 @@ export function useTodayRoute(routeDate = todayIsoDate()): UseTodayRouteResult {
     } finally {
       setLoading(false);
     }
-  }, [routeDate, user]);
+  }, [routeDate, session?.access_token, user]);
 
   useEffect(() => {
     let cancelled = false;
