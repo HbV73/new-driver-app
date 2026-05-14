@@ -15,6 +15,8 @@ import mascot from '@/assets/mascot.png';
 
 const ONBOARDING_KEY = 'rs_onboarding_done';
 
+const useRestAuth = import.meta.env.VITE_DRIVER_API_PROVIDER === 'rest';
+
 const Login = () => {
   const navigate = useNavigate();
   const { signIn, session } = useAuth();
@@ -56,7 +58,7 @@ const Login = () => {
     const { error } = await signIn(email, password);
     setIsLoading(false);
     if (error) {
-      setError(t('login.wrongCreds'));
+      setError(useRestAuth ? (error.trim() || t('login.wrongCredsRest')) : t('login.wrongCreds'));
     } else {
       if (!await isPinSetup()) {
         setStep('pin-setup');
@@ -340,18 +342,24 @@ const Login = () => {
               className="space-y-4"
             >
               <div className="space-y-1.5">
-                <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">{t('login.email')}</label>
+                <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
+                  {useRestAuth ? t('login.loginId') : t('login.email')}
+                </label>
                 <div className="relative group">
                   <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/50 group-focus-within:text-primary transition-colors" />
                   <Input
-                    type="email"
-                    placeholder="fahrer@example.com"
+                    type={useRestAuth ? 'text' : 'email'}
+                    placeholder={useRestAuth ? '+49… / fahrer@… / DRV-001' : 'fahrer@example.com'}
                     value={email}
                     onChange={(e) => { setEmail(e.target.value); setError(''); }}
                     className="pl-10 h-12 rounded-xl border-border bg-card text-sm focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:border-primary/40"
                     autoFocus
+                    autoComplete={useRestAuth ? 'username' : 'email'}
                   />
                 </div>
+                {useRestAuth ? (
+                  <p className="text-[11px] text-muted-foreground leading-snug px-0.5">{t('login.loginIdHint')}</p>
+                ) : null}
               </div>
 
               <div className="space-y-1.5">

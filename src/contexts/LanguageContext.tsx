@@ -131,6 +131,12 @@ const translations = {
   'login.register': { de: 'Konto erstellen', en: 'Create Account' },
   'login.registerSub': { de: 'Registrieren Sie sich', en: 'Register a new account' },
   'login.email': { de: 'E-Mail', en: 'Email' },
+  /** First login field when ``VITE_DRIVER_API_PROVIDER=rest`` (maps to API ``username``). */
+  'login.loginId': { de: 'Anmeldename', en: 'Username' },
+  'login.loginIdHint': {
+    de: 'Telefon, E-Mail oder Fahrercode — wie im Dispatcher angelegt (nicht zwingend eine E-Mail).',
+    en: 'Phone, email, or driver code — same as saved in the dispatcher (not necessarily an email).',
+  },
   'login.password': { de: 'Passwort', en: 'Password' },
   'login.fullName': { de: 'Vollständiger Name', en: 'Full Name' },
   'login.signInBtn': { de: 'Anmelden', en: 'Sign In' },
@@ -141,6 +147,7 @@ const translations = {
   'login.hasAccount': { de: 'Bereits ein Konto?', en: 'Already have an account?' },
   'login.fillAll': { de: 'Bitte alle Felder ausfüllen', en: 'Please fill in all fields' },
   'login.wrongCreds': { de: 'E-Mail oder Passwort falsch', en: 'Email or password incorrect' },
+  'login.wrongCredsRest': { de: 'Benutzername oder Passwort falsch', en: 'Username or password incorrect' },
   'login.pwdMin': { de: 'Passwort muss mindestens 6 Zeichen lang sein', en: 'Password must be at least 6 characters' },
   'login.newAccount': { de: 'Neues Konto erstellen', en: 'Create new account' },
   'login.readyForTour': { de: 'Bereit für die Tour?', en: 'Ready for the tour?' },
