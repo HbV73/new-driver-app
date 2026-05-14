@@ -5,7 +5,7 @@ name: Android debug APK
 
 on:
   push:
-    branches: [main]
+    branches: [main, develop]
   workflow_dispatch:
 
 concurrency:
@@ -57,7 +57,8 @@ jobs:
         env:
           VITE_SUPABASE_URL: https://igvureriqikqtefxqkje.supabase.co
           VITE_SUPABASE_PUBLISHABLE_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlndnVyZXJpcWlrcXRlZnhxa2plIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ0MzU3OTMsImV4cCI6MjA5MDAxMTc5M30.XTI5dPBIfUZmT_8hMplJ8zZ9uurvMJI2toj4Y-gm8j4
-          VITE_DRIVER_API_PROVIDER: supabase
+          VITE_DRIVER_API_PROVIDER: rest
+          VITE_DRIVER_API_BASE_URL: https://apis.germanwm.de
         run: npm run build
 
       - name: Capacitor sync Android
